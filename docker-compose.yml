@@ -1,0 +1,11 @@
+services:
+  astrosight:
+    build: .
+    container_name: astrosight-platform
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    volumes:
+      - ./backend/astrosight.db:/app/backend/astrosight.db
+      - ./backend/uploads:/app/backend/uploads
+      - ./backend/reports_storage:/app/backend/reports_storage
