@@ -1,7 +1,7 @@
 import os
 import sys
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -84,7 +84,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"]
 )
@@ -145,9 +145,11 @@ app.include_router(admin_router, prefix=settings.API_V1_STR)
 
 
 
-# Root Route: Serves Frontend or API metadata
-@app.get("/")
-def read_root():
+# Root Route: Serves Frontend or API metadata (Supports GET and HEAD for Cloud Health Checks)
+@app.api_route("/", methods=["GET", "HEAD"])
+def read_root(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=status.HTTP_200_OK)
     index_file = os.path.join(FRONTEND_DIST, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
@@ -157,4 +159,16 @@ def read_root():
         "status": "ONLINE",
         "api_v1_docs": "/docs" if settings.DEBUG else "Protected",
         "api_prefix": settings.API_V1_STR
+    }
+
+# Health Check Endpoints for Render, Cloud Load Balancers & Monitoring
+@app.api_route("/health", methods=["GET", "HEAD"])
+@app.api_route("/api/v1/health", methods=["GET", "HEAD"])
+def health_check(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=status.HTTP_200_OK)
+    return {
+        "status": "HEALTHY",
+        "platform": settings.APP_NAME,
+        "environment": settings.ENVIRONMENT
     }
