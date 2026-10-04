@@ -1,6 +1,7 @@
 export interface Crater {
   id?: number;
   index: number;
+  crater_index?: number;
   name?: string;
   x: number;
   y: number;

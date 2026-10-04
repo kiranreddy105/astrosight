@@ -81,6 +81,37 @@ def get_optional_current_user(
         return None
     return None
 
+def get_user_or_guest(
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Returns authenticated user if present and valid.
+    Otherwise, returns or creates a persistent Guest Explorer user so unauthenticated
+    visitors can test and explore planetary analyses without hard authorization blockage.
+    """
+    user = get_optional_current_user(request, token, db)
+    if user:
+        return user
+
+    guest = db.query(User).filter(User.email == "guest@astrosight.local").first()
+    if not guest:
+        from .security import get_password_hash
+        guest = User(
+            email="guest@astrosight.local",
+            hashed_password=get_password_hash("guest-astrosight-demo-2026"),
+            full_name="Guest Planetary Explorer",
+            role="guest",
+            planet_preference="Moon",
+            is_active=True,
+            is_verified=True
+        )
+        db.add(guest)
+        db.commit()
+        db.refresh(guest)
+    return guest
+
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     """Enforces server-side administrator authorization."""
     if current_user.role != "admin":

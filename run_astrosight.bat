@@ -7,6 +7,13 @@ echo =====================================================================
 echo    ASTROSIGHT: LUNAR CRATER CLASSIFICATION & SPATIAL ANALYSIS
 echo           AI-Powered Planetary Surface Intelligence
 echo =====================================================================
+echo Cleaning up any previous lingering instances on port 8000 and 5173...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8000" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5173" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
 echo.
 
 echo [1/2] Starting AstroSight FastAPI Backend Server on port 8000...

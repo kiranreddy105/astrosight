@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ...core.config import settings
 from ...core.database import get_db
-from ...core.deps import get_current_user, log_security_event
+from ...core.deps import get_current_user, get_user_or_guest, log_security_event
 from ...core.file_security import validate_and_save_upload
 from ...models.user import User
 
@@ -17,7 +17,7 @@ def upload_file(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_user_or_guest)
 ):
     """
     Secure file upload:
@@ -43,7 +43,7 @@ def upload_file(
 def get_private_file(
     file_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_user_or_guest)
 ):
     """
     Authorized private file access:
@@ -76,10 +76,22 @@ def get_private_file(
                             full_path = os.path.join(full_uid_dir, fname)
                             return FileResponse(full_path, headers={"X-Content-Type-Options": "nosniff"})
 
-    # 3. Check if it's an annotated output file
+    # 3. Check if it's an annotated output file in current user folder
     annotated_dir = os.path.join(settings.PRIVATE_STORAGE_DIR, "uploads", str(current_user.id))
     annotated_candidate = os.path.join(annotated_dir, f"annotated_{file_id}.jpg")
     if os.path.exists(annotated_candidate):
         return FileResponse(annotated_candidate, media_type="image/jpeg", headers={"X-Content-Type-Options": "nosniff"})
+
+    # 4. Fallback: check guest folder if record was generated in guest session
+    guest = db.query(User).filter(User.email == "guest@astrosight.local").first()
+    if guest and guest.id != current_user.id:
+        guest_upload_dir = os.path.join(settings.PRIVATE_STORAGE_DIR, "uploads", str(guest.id))
+        if os.path.exists(guest_upload_dir):
+            for fname in os.listdir(guest_upload_dir):
+                if fname.startswith(f"{file_id}_") or fname == f"annotated_{file_id}.jpg":
+                    full_path = os.path.join(guest_upload_dir, fname)
+                    ext = os.path.splitext(fname)[1].lower()
+                    media_type = "image/png" if ext == ".png" else "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/tiff"
+                    return FileResponse(full_path, media_type=media_type, headers={"X-Content-Type-Options": "nosniff"})
 
     raise HTTPException(status_code=404, detail="File not found or unauthorized access.")

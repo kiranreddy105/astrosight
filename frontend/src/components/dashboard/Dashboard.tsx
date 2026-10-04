@@ -4,17 +4,18 @@ import {
   Crosshair,
   Percent,
   Ruler,
-  ArrowUpRight,
+  ArrowRight,
   Sparkles,
-  Satellite,
   Compass,
   CheckCircle2,
-  FileText,
   Clock,
-  ExternalLink
+  Layers,
+  FileCheck,
+  Activity,
+  Globe
 } from 'lucide-react';
 import { CelestialGlobe3D } from '../map/CelestialGlobe3D';
-import { DashboardStats, AnalysisRecord, SampleImage } from '../../types';
+import { DashboardStats, SampleImage } from '../../types';
 
 interface DashboardProps {
   stats: DashboardStats | null;
@@ -32,159 +33,234 @@ export const Dashboard: React.FC<DashboardProps> = ({
   selectedPlanet
 }) => {
   const imagesAnalyzed = stats?.images_analyzed || 1284;
-  const cratersDetected = stats?.craters_detected || 3721;
+  const cratersDetected = stats?.craters_detected || 127;
   const avgConfidence = stats?.average_confidence || 94.7;
-  const totalMeasurements = stats?.total_measurements || 8452;
+  const spatialCoverage = '68.4 km²';
+  const processingTime = '2.8 sec';
 
   const filteredSamples = samples.filter(
     (s) => s.planet.toLowerCase() === selectedPlanet.toLowerCase()
   );
 
+  const workflowSteps = [
+    { num: '01', title: 'Upload', desc: 'Satellite Raster' },
+    { num: '02', title: 'Validate', desc: 'Planetary Check' },
+    { num: '03', title: 'Preprocess', desc: 'CLAHE & Denoise' },
+    { num: '04', title: 'Detect', desc: 'CraterNet CNN' },
+    { num: '05', title: 'Analyze', desc: 'Spatial Geodesy' },
+    { num: '06', title: 'Report', desc: 'PDF Dossier' }
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Hero Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl glass-panel p-6 md:p-8 border border-nasa-cyan/30 hud-grid grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-        <div className="lg:col-span-8 space-y-3 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-nasa-cyan/10 border border-nasa-cyan/30 text-nasa-cyan text-xs font-mono">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>DEEP LEARNING PLANETARY RECONNAISSANCE PLATFORM</span>
+    <div className="space-y-8">
+      {/* 1. Main Hero Area */}
+      <section className="relative overflow-hidden rounded-3xl glass-panel p-8 sm:p-12 border border-nasa-cyan/30 hud-grid">
+        {/* Subtle background glow and radial gradient */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-nasa-cyan/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-cosmic-violet/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
+          <div className="lg:col-span-7 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-nasa-cyan/10 border border-nasa-cyan/30 text-nasa-cyan text-xs font-mono">
+              <span className="text-sm">✦</span>
+              <span>PLANETARY SURFACE INTELLIGENCE & COMPUTER VISION</span>
+            </div>
+
+            {/* Scientific Headline with Italic Accent Font */}
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight font-tight leading-[1.1]">
+              Explore the Surface.<br />
+              Detect the <span className="font-accent italic text-nasa-cyan font-normal drop-shadow-[0_0_20px_rgba(56,189,248,0.4)]">Unknown</span>.
+            </h1>
+
+            {/* Supporting Text */}
+            <p className="text-base sm:text-lg text-slate-300 font-sans max-w-xl leading-relaxed">
+              AI-powered lunar crater detection and spatial analysis from satellite imagery.
+            </p>
+
+            {/* Actions: Primary CTA & Secondary CTA */}
+            <div className="pt-2 flex flex-wrap items-center gap-4">
+              <button
+                onClick={() => onNavigate('analysis')}
+                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-nasa-cyan via-sky-500 to-blue-600 text-space-950 font-bold font-tight text-sm uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-nasa-cyan/25 flex items-center gap-2 group"
+              >
+                <span>Analyze Image</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              <button
+                onClick={() => {
+                  if (samples.length > 0) onLoadSample(samples[0]);
+                  else onNavigate('analysis');
+                }}
+                className="px-6 py-3.5 rounded-xl bg-space-900/80 border border-nasa-cyan/30 hover:border-nasa-cyan text-slate-200 hover:text-white font-mono text-sm tracking-wider transition-all flex items-center gap-2 hover:bg-space-800/80"
+              >
+                <Sparkles className="w-4 h-4 text-nasa-cyan" />
+                <span>Explore Demo</span>
+              </button>
+            </div>
+
+            {/* Telemetry coordinate strip */}
+            <div className="pt-3 flex items-center gap-4 text-[11px] font-mono text-slate-400">
+              <span className="flex items-center gap-1.5 text-nasa-emerald">
+                <span className="w-2 h-2 rounded-full bg-nasa-emerald animate-ping" />
+                <span>SYSTEM ONLINE</span>
+              </span>
+              <span>•</span>
+              <span>TARGET: {selectedPlanet.toUpperCase()}</span>
+              <span>•</span>
+              <span className="text-slate-500">RES: 10.0 M/PX</span>
+            </div>
           </div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight font-mono">
-            Autonomous Geological Surface Analysis & Crater Telemetry
-          </h2>
-          <p className="text-sm text-slate-300 leading-relaxed">
-            AstroSight combines high-resolution multi-spectral satellite imagery, convolutional neural network (CraterNet) feature extraction, and geodesic spatial Euclidean distance modeling to map planetary impact structures across lunar maria and martian plateaus.
-          </p>
-          <div className="pt-2 flex flex-wrap gap-3">
-            <button
-              onClick={() => onNavigate('analysis')}
-              className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-nasa-cyan to-blue-600 text-space-950 font-bold font-mono text-xs uppercase tracking-wider hover:brightness-110 transition-all shadow-lg shadow-nasa-cyan/20 flex items-center gap-2"
+
+          {/* 3D Celestial Visualization */}
+          <div className="lg:col-span-5 flex flex-col items-center justify-center relative">
+            <div className="relative flex items-center justify-center p-4">
+              <div className="absolute -inset-6 orbit-ring pointer-events-none" />
+              <div className="absolute -inset-12 border border-dashed border-nasa-cyan/15 rounded-full pointer-events-none" />
+              <CelestialGlobe3D selectedPlanet={selectedPlanet} size={260} interactive={true} />
+            </div>
+            <div className="mt-3 text-center">
+              <span className="text-xs font-mono text-nasa-cyan uppercase tracking-wider font-bold">
+                {selectedPlanet.toUpperCase()} CELESTIAL PROJECTION
+              </span>
+              <p className="text-[11px] text-slate-400 font-mono">Interactive Geodesic Coordinate Sphere</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Workflow Indicator (01 Upload → 02 Validate → 03 Preprocess → 04 Detect → 05 Analyze → 06 Report) */}
+      <section className="glass-panel p-6 rounded-2xl border border-nasa-cyan/20">
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-space-700/60">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-nasa-cyan" />
+            <h2 className="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold">
+              Automated Analysis Pipeline Workflow
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono text-nasa-cyan">END-TO-END AUTONOMOUS</span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          {workflowSteps.map((step, idx) => (
+            <div
+              key={step.num}
+              className="relative p-3.5 rounded-xl bg-space-950/60 border border-space-700/70 hover:border-nasa-cyan/50 transition-all group flex flex-col justify-between"
             >
-              <Scan className="w-4 h-4" />
-              <span>Initiate New Image Analysis</span>
-            </button>
-            <button
-              onClick={() => onNavigate('map')}
-              className="px-5 py-2.5 rounded-lg bg-space-800/80 border border-space-700 hover:border-nasa-cyan/40 text-slate-200 font-mono text-xs uppercase tracking-wider transition-all flex items-center gap-2"
-            >
-              <Compass className="w-4 h-4 text-nasa-cyan" />
-              <span>Explore Planetary 3D Orbit</span>
-            </button>
-          </div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono font-bold text-nasa-cyan">
+                  {step.num}
+                </span>
+                <span className="w-2 h-2 rounded-full bg-nasa-cyan/40 group-hover:bg-nasa-cyan group-hover:shadow-[0_0_8px_#38bdf8] transition-all" />
+              </div>
+              <div>
+                <div className="text-sm font-bold font-tight text-white group-hover:text-nasa-cyan transition-colors">
+                  {step.title}
+                </div>
+                <div className="text-[10px] font-mono text-slate-400">
+                  {step.desc}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
+      </section>
 
-        {/* 3D Celestial Globe Visualizer on Right */}
-        <div className="lg:col-span-4 hidden lg:flex flex-col items-center justify-center relative">
-          <div className="relative flex items-center justify-center">
-            <div className="absolute -inset-4 orbit-ring pointer-events-none" />
-            <CelestialGlobe3D selectedPlanet={selectedPlanet} size={210} interactive={false} />
-          </div>
-          <div className="mt-3 text-center">
-            <span className="text-xs font-mono text-nasa-cyan uppercase tracking-wider font-bold">
-              {selectedPlanet.toUpperCase()} TARGET RECONNAISSANCE
-            </span>
-            <p className="text-[10px] text-slate-400 font-mono">Real-time 3D Celestial Projection</p>
-          </div>
-        </div>
-
-        {/* Decorative corner grid marks */}
-        <div className="absolute right-4 top-3 text-[10px] font-mono text-slate-500 opacity-60">
-          SYS_LAT: 23.472°N | SYS_LON: 064.318°E
-        </div>
-      </div>
-
-      {/* 4 Statistics KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Images Analyzed */}
-        <div className="glass-panel p-5 rounded-xl border-l-4 border-l-nasa-cyan flex flex-col justify-between">
+      {/* 3. Statistics Cards (4 Glassmorphism KPI Cards) */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Detected Features */}
+        <div className="glass-panel p-6 rounded-2xl border border-nasa-cyan/20 border-l-4 border-l-nasa-cyan flex flex-col justify-between hover:border-nasa-cyan/50 transition-all shadow-lg">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Images Analyzed</span>
-            <div className="p-2 rounded-lg bg-nasa-cyan/10 text-nasa-cyan">
-              <Scan className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="text-2xl font-bold font-mono text-white tracking-tight">
-              {imagesAnalyzed.toLocaleString()}
-            </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-nasa-emerald font-mono">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>+18.4% this mission cycle</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Craters Detected */}
-        <div className="glass-panel p-5 rounded-xl border-l-4 border-l-blue-500 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Craters Detected</span>
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+            <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Detected Features</span>
+            <div className="p-2.5 rounded-xl bg-nasa-cyan/15 text-nasa-cyan border border-nasa-cyan/30">
               <Crosshair className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-2xl font-bold font-mono text-white tracking-tight">
+            <div className="text-3xl font-extrabold font-tight text-white tracking-tight">
               {cratersDetected.toLocaleString()}
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-blue-400 font-mono">
-              <span>99.2% localization confidence</span>
-            </div>
+            <p className="mt-1 text-xs text-nasa-cyan font-mono flex items-center gap-1">
+              <span>Impact basins localized</span>
+            </p>
           </div>
         </div>
 
-        {/* Card 3: Average Confidence */}
-        <div className="glass-panel p-5 rounded-xl border-l-4 border-l-nasa-emerald flex flex-col justify-between">
+        {/* Card 2: Average Confidence */}
+        <div className="glass-panel p-6 rounded-2xl border border-nasa-cyan/20 border-l-4 border-l-sky-400 flex flex-col justify-between hover:border-sky-400/50 transition-all shadow-lg">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Average Confidence</span>
-            <div className="p-2 rounded-lg bg-nasa-emerald/10 text-nasa-emerald">
+            <div className="p-2.5 rounded-xl bg-sky-400/15 text-sky-400 border border-sky-400/30">
               <Percent className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-2xl font-bold font-mono text-white tracking-tight">
+            <div className="text-3xl font-extrabold font-tight text-white tracking-tight">
               {avgConfidence.toFixed(1)}%
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-nasa-emerald font-mono">
+            <p className="mt-1 text-xs text-nasa-emerald font-mono flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>CraterNet CNN validated</span>
-            </div>
+            </p>
           </div>
         </div>
 
-        {/* Card 4: Total Measurements */}
-        <div className="glass-panel p-5 rounded-xl border-l-4 border-l-nasa-amber flex flex-col justify-between">
+        {/* Card 3: Spatial Coverage */}
+        <div className="glass-panel p-6 rounded-2xl border border-nasa-cyan/20 border-l-4 border-l-cosmic-violet flex flex-col justify-between hover:border-cosmic-violet/50 transition-all shadow-lg">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Spatial Measurements</span>
-            <div className="p-2 rounded-lg bg-nasa-amber/10 text-nasa-amber">
+            <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Spatial Coverage</span>
+            <div className="p-2.5 rounded-xl bg-cosmic-violet/15 text-purple-400 border border-purple-400/30">
               <Ruler className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <div className="text-2xl font-bold font-mono text-white tracking-tight">
-              {totalMeasurements.toLocaleString()}
+            <div className="text-3xl font-extrabold font-tight text-white tracking-tight">
+              {spatialCoverage}
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-nasa-amber font-mono">
-              <span>Geodesic Euclidean vectors</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Launch Demo Imagery Selector */}
-      <div className="glass-panel p-6 rounded-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold font-mono text-white flex items-center gap-2">
-              <Satellite className="w-4 h-4 text-nasa-cyan" />
-              <span>Target Reconnaissance Samples ({selectedPlanet.toUpperCase()})</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Select verified high-resolution planetary satellite imagery to run analysis immediately in Demo Mode.
+            <p className="mt-1 text-xs text-purple-300 font-mono">
+              Calibrated raster area
             </p>
           </div>
-          <span className="text-[11px] font-mono text-nasa-cyan px-2 py-0.5 rounded bg-nasa-cyan/10 border border-nasa-cyan/30">
-            DEMO MODE READY
-          </span>
+        </div>
+
+        {/* Card 4: Processing Time */}
+        <div className="glass-panel p-6 rounded-2xl border border-nasa-cyan/20 border-l-4 border-l-nasa-emerald flex flex-col justify-between hover:border-nasa-emerald/50 transition-all shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono uppercase tracking-wider text-slate-400">Processing Time</span>
+            <div className="p-2.5 rounded-xl bg-nasa-emerald/15 text-nasa-emerald border border-nasa-emerald/30">
+              <Clock className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold font-tight text-white tracking-tight">
+              {processingTime}
+            </div>
+            <p className="mt-1 text-xs text-nasa-emerald font-mono">
+              Real-time inference speed
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Planetary Demo Corpus Row */}
+      <section className="glass-panel p-6 rounded-2xl border border-nasa-cyan/20 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold font-tight text-white flex items-center gap-2">
+              <Globe className="w-4 h-4 text-nasa-cyan" />
+              <span>Standard Planetary Benchmark Corpus</span>
+            </h3>
+            <p className="text-xs font-mono text-slate-400">
+              LROC NAC & HiRISE high-resolution orbital telemetry captures
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate('analysis')}
+            className="text-xs font-mono text-nasa-cyan hover:underline flex items-center gap-1"
+          >
+            <span>Upload Custom Imagery</span>
+            <ArrowRight className="w-3 h-3" />
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -192,109 +268,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div
               key={sample.id}
               onClick={() => onLoadSample(sample)}
-              className="group cursor-pointer rounded-lg bg-space-850/80 border border-space-700/80 overflow-hidden hover:border-nasa-cyan/60 transition-all hover:shadow-lg hover:shadow-nasa-cyan/10"
+              className="group cursor-pointer rounded-xl bg-space-950/70 border border-space-700 hover:border-nasa-cyan p-3 transition-all hover:shadow-xl hover:shadow-nasa-cyan/10"
             >
-              <div className="h-32 bg-space-950 relative overflow-hidden">
+              <div className="relative h-32 rounded-lg overflow-hidden bg-space-900 border border-space-800">
                 <img
                   src={sample.url}
                   alt={sample.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                <span className="absolute top-2 left-2 px-1.5 py-0.5 text-[9.5px] font-mono rounded bg-black/75 text-nasa-cyan border border-nasa-cyan/30">
+                <div className="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-mono bg-space-950/80 text-nasa-cyan border border-nasa-cyan/30">
                   {sample.planet.toUpperCase()}
-                </span>
-                <span className="absolute bottom-2 right-2 px-1.5 py-0.5 text-[9.5px] font-mono rounded bg-black/75 text-slate-300">
-                  {sample.default_resolution} m/px
-                </span>
+                </div>
               </div>
-              <div className="p-3.5 space-y-1.5">
-                <h4 className="text-xs font-bold font-mono text-white group-hover:text-nasa-cyan transition-colors">
+              <div className="mt-3">
+                <div className="text-xs font-bold text-white font-tight group-hover:text-nasa-cyan transition-colors truncate">
                   {sample.name}
-                </h4>
-                <p className="text-[11px] text-slate-400 line-clamp-2">
-                  {sample.description}
-                </p>
-                <div className="pt-1 flex items-center justify-between text-[10.5px] font-mono text-slate-500">
-                  <span>{sample.mission}</span>
-                  <span className="text-nasa-cyan group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                    Analyze &rarr;
-                  </span>
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate">
+                  {sample.mission} • {sample.default_resolution} m/px
                 </div>
               </div>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Operational Pipeline Architecture Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: AI Pipeline Flow */}
-        <div className="lg:col-span-2 glass-panel p-6 rounded-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-space-700/60 pb-3">
-            <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-nasa-cyan" />
-              <span>AstroSight Autonomous Pipeline Architecture</span>
-            </h3>
-            <span className="text-xs font-mono text-nasa-emerald">8-STAGE ACTIVE</span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
-            {[
-              { step: '01', title: 'Telemetry Ingest', desc: 'PNG / JPG / TIFF raster ingestion' },
-              { step: '02', title: 'Preprocessing', desc: 'CLAHE & Gaussian noise filtration' },
-              { step: '03', title: 'CraterNet CNN', desc: 'Deep Conv2D feature representation' },
-              { step: '04', title: 'Candidate NMS', desc: 'Morphological Hough & suppression' },
-              { step: '05', title: 'Coordinate Extr.', desc: 'Centroid (X, Y) & radius extraction' },
-              { step: '06', title: 'Spatial Engine', desc: 'Euclidean distance d = √((Δx)²+(Δy)²)' },
-              { step: '07', title: 'Metric Scaling', desc: 'Real distance = px × resolution' },
-              { step: '08', title: 'Dossier Export', desc: 'Publication NASA-styled PDF generation' },
-            ].map((st) => (
-              <div key={st.step} className="p-3 rounded-lg bg-space-850/60 border border-space-700/50">
-                <span className="text-[10px] text-nasa-cyan font-bold block">{st.step}</span>
-                <span className="font-semibold text-slate-200 block mt-0.5">{st.title}</span>
-                <span className="text-[10px] text-slate-400 block mt-1 leading-snug">{st.desc}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: Mission System Health */}
-        <div className="glass-panel p-6 rounded-xl space-y-4">
-          <div className="border-b border-space-700/60 pb-3">
-            <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
-              <Satellite className="w-4 h-4 text-nasa-cyan" />
-              <span>System Telemetry</span>
-            </h3>
-          </div>
-
-          <div className="space-y-3 font-mono text-xs">
-            <div className="flex justify-between items-center py-1 border-b border-space-800">
-              <span className="text-slate-400">Backend Framework:</span>
-              <span className="text-slate-200">FastAPI Async Core</span>
-            </div>
-            <div className="flex justify-between items-center py-1 border-b border-space-800">
-              <span className="text-slate-400">Deep Learning Engine:</span>
-              <span className="text-slate-200">PyTorch v2.6+</span>
-            </div>
-            <div className="flex justify-between items-center py-1 border-b border-space-800">
-              <span className="text-slate-400">Computer Vision:</span>
-              <span className="text-slate-200">OpenCV 4.11+</span>
-            </div>
-            <div className="flex justify-between items-center py-1 border-b border-space-800">
-              <span className="text-slate-400">Geodesic Metrics:</span>
-              <span className="text-slate-200">Euclidean + Scaling</span>
-            </div>
-            <div className="flex justify-between items-center py-1 border-b border-space-800">
-              <span className="text-slate-400">PDF Dossier Engine:</span>
-              <span className="text-slate-200">ReportLab Enterprise</span>
-            </div>
-            <div className="flex justify-between items-center py-1">
-              <span className="text-slate-400">Database Engine:</span>
-              <span className="text-slate-200">SQLite Persistence</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
   );
 };

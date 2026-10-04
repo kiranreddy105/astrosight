@@ -11,7 +11,7 @@ from sqlalchemy import desc
 
 from ...core.config import settings
 from ...core.database import get_db
-from ...core.deps import get_current_user, log_security_event
+from ...core.deps import get_current_user, get_user_or_guest, log_security_event
 from ...core.rate_limiter import limiter
 from ...models.user import User
 from ...models.analysis import Analysis, DetectedCrater, SpatialMeasurement
@@ -46,7 +46,7 @@ def create_analysis(
     request: Request,
     body: AnalysisCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_user_or_guest)
 ):
     """
     Executes the modular AstroSight planetary surface intelligence pipeline:
@@ -283,7 +283,7 @@ def get_analyses(
 def get_analysis_detail(
     analysis_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_user_or_guest)
 ):
     """Returns single analysis record with ownership enforcement."""
     analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
@@ -291,7 +291,8 @@ def get_analysis_detail(
         raise HTTPException(status_code=404, detail="Analysis record not found.")
 
     if analysis.user_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Unauthorized access to this analysis record.")
+        if not (analysis.owner and analysis.owner.role == "guest"):
+            raise HTTPException(status_code=403, detail="Unauthorized access to this analysis record.")
 
     image_url = f"{settings.API_V1_STR}/files/{analysis.id}" if not analysis.is_demo else f"/static/samples/{analysis.original_filename}"
     annotated_url = f"{settings.API_V1_STR}/files/{analysis.id}"
@@ -353,7 +354,7 @@ def calculate_spatial_pair(
     analysis_id: str,
     body: SpatialCalcRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_user_or_guest)
 ):
     """Calculates Euclidean pixel distance and ground metric distance for selected crater pair."""
     # Check ownership
@@ -361,7 +362,8 @@ def calculate_spatial_pair(
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found.")
     if analysis.user_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Unauthorized access to this analysis.")
+        if not (analysis.owner and analysis.owner.role == "guest"):
+            raise HTTPException(status_code=403, detail="Unauthorized access to this analysis.")
 
     # Strict non-finite scale rejection
     if not math.isfinite(body.resolution_m_px) or body.resolution_m_px <= 0:
@@ -395,7 +397,7 @@ def calculate_spatial_pair(
 def download_pdf_report(
     analysis_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_user_or_guest)
 ):
     """
     Authorized PDF report streaming:
@@ -406,7 +408,8 @@ def download_pdf_report(
         raise HTTPException(status_code=404, detail="Report not found.")
 
     if analysis.user_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Unauthorized access to this report.")
+        if not (analysis.owner and analysis.owner.role == "guest"):
+            raise HTTPException(status_code=403, detail="Unauthorized access to this report.")
 
     user_reports_dir = os.path.join(settings.PRIVATE_STORAGE_DIR, "reports", str(analysis.user_id))
     pdf_filename = f"AstroSight_Report_{analysis_id[:8]}.pdf"
