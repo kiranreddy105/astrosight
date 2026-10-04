@@ -21,12 +21,14 @@ import { AdminPersonnel } from './components/admin/AdminPersonnel';
 
 import { api } from './services/api';
 import { DashboardStats, SampleImage, AnalysisRecord } from './types';
+import { DEFAULT_BASELINE_ANALYSIS, DEFAULT_SAMPLE_IMAGE } from './utils/defaultData';
 
 function AppContent() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedPlanet, setSelectedPlanet] = useState<string>(user?.planet_preference || 'Moon');
-  const [activeAnalysis, setActiveAnalysis] = useState<AnalysisRecord | null>(null);
+  const [activeAnalysis, setActiveAnalysis] = useState<AnalysisRecord | null>(DEFAULT_BASELINE_ANALYSIS);
+  const [currentSample, setCurrentSample] = useState<SampleImage>(DEFAULT_SAMPLE_IMAGE);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [samples, setSamples] = useState<SampleImage[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -61,6 +63,7 @@ function AppContent() {
   }, [user?.planet_preference]);
 
   const handleLoadSample = (sample: SampleImage) => {
+    setCurrentSample(sample);
     setSelectedPlanet(sample.planet);
     setActiveTab('analysis');
   };
@@ -116,6 +119,8 @@ function AppContent() {
               onNavigate={setActiveTab}
               isProcessing={isProcessing}
               setIsProcessing={setIsProcessing}
+              currentSample={currentSample}
+              onSelectSample={setCurrentSample}
             />
           )}
 

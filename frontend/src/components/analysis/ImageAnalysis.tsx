@@ -38,6 +38,8 @@ interface ImageAnalysisProps {
   onNavigate: (tab: string) => void;
   isProcessing: boolean;
   setIsProcessing: (loading: boolean) => void;
+  currentSample?: SampleImage;
+  onSelectSample?: (sample: SampleImage) => void;
 }
 
 export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
@@ -48,13 +50,17 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
   setActiveAnalysis,
   onNavigate,
   isProcessing,
-  setIsProcessing
+  setIsProcessing,
+  currentSample,
+  onSelectSample
 }) => {
   // Image selection & file metadata state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>(samples[0]?.url || '');
+  const [previewUrl, setPreviewUrl] = useState<string>(
+    currentSample?.url || activeAnalysis?.image_url || samples[0]?.url || '/static/samples/lunar_apollo11_tranquillitatis.jpg'
+  );
   const [currentFilename, setCurrentFilename] = useState<string>(
-    samples[0]?.filename || 'lunar_apollo11_tranquillitatis.jpg'
+    currentSample?.filename || activeAnalysis?.filename || samples[0]?.filename || 'lunar_apollo11_tranquillitatis.jpg'
   );
   const [validationResult, setValidationResult] = useState<ValidationResult>({
     isValid: true,
@@ -118,6 +124,35 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
     }
   }, [activeAnalysis?.id]);
 
+  // Synchronize when currentSample prop changes
+  useEffect(() => {
+    if (currentSample) {
+      setSelectedFile(null);
+      setPreviewUrl(currentSample.url);
+      setCurrentFilename(currentSample.filename);
+      setSelectedPlanet(currentSample.planet);
+      setResolutionMeters(currentSample.default_resolution);
+      setErrorMsg(null);
+      setValidationResult({
+        isValid: true,
+        reason: 'Image validated successfully',
+        dimensions: { width: 1024, height: 1024 },
+        format: 'JPG',
+        sizeMb: 1.2
+      });
+    }
+  }, [currentSample?.id]);
+
+  // If samples load and previewUrl was empty, initialize with first sample
+  useEffect(() => {
+    if (!previewUrl && samples.length > 0) {
+      setPreviewUrl(samples[0].url);
+      setCurrentFilename(samples[0].filename);
+      setSelectedPlanet(samples[0].planet);
+      setResolutionMeters(samples[0].default_resolution);
+    }
+  }, [samples]);
+
   // Handle Drag & Drop
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -168,6 +203,9 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
       sizeMb: 1.2
     });
     setProcessingStatus('Ready');
+    if (onSelectSample) {
+      onSelectSample(sample);
+    }
   };
 
   // Run AI Crater Detection Pipeline
@@ -493,6 +531,50 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Quick Benchmark Corpus Selector */}
+          {samples.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                <span className="flex items-center gap-1.5 font-bold text-slate-300">
+                  <Sparkles className="w-3.5 h-3.5 text-nasa-cyan" />
+                  <span>Or select from Benchmark Corpus:</span>
+                </span>
+                <span>{samples.length} planetary rasters</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {samples.map((s) => {
+                  const isCur = currentFilename === s.filename;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleSelectSample(s)}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2.5 group ${
+                        isCur
+                          ? 'bg-nasa-cyan/15 border-nasa-cyan shadow-md shadow-nasa-cyan/10'
+                          : 'bg-space-950/70 border-space-800 hover:border-nasa-cyan/50 hover:bg-space-900/80'
+                      }`}
+                    >
+                      <img
+                        src={s.url}
+                        alt={s.name}
+                        className="w-10 h-10 rounded-lg object-cover border border-space-700 flex-shrink-0 group-hover:scale-105 transition-transform"
+                      />
+                      <div className="min-w-0 flex-1 font-mono">
+                        <div className={`text-[11px] font-bold truncate ${isCur ? 'text-nasa-cyan' : 'text-white'}`}>
+                          {s.name}
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {s.planet} • {s.default_resolution} m/px
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Controls: Planet, Analysis Mode, Scale, and Validation Feedback */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
