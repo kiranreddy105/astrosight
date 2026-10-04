@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { CosmicBackground } from './components/layout/CosmicBackground';
 import { DisclaimerBanner } from './components/layout/DisclaimerBanner';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { ImageAnalysis } from './components/analysis/ImageAnalysis';
@@ -62,7 +63,10 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-space-950 text-slate-100 flex">
+    <div className="min-h-screen bg-space-950 text-slate-100 flex relative">
+      {/* 3D Cosmic Starfield & Nebula Background */}
+      <CosmicBackground />
+
       {/* Fixed NASA Mission Control Sidebar */}
       <Sidebar
         activeTab={activeTab}

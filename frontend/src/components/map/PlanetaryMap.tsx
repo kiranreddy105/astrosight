@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { SampleImage } from '../../types';
+import { Planetary3DOrbit } from './Planetary3DOrbit';
 
 interface PlanetaryMapProps {
   selectedPlanet: string;
@@ -27,6 +28,7 @@ export const PlanetaryMap: React.FC<PlanetaryMapProps> = ({
   samples,
   onSelectSampleForAnalysis
 }) => {
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
   const [zoom, setZoom] = useState<number>(1.0);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -262,32 +264,68 @@ export const PlanetaryMap: React.FC<PlanetaryMapProps> = ({
           </p>
         </div>
 
-        {/* Planet Toggle Buttons */}
-        <div className="flex items-center gap-2 bg-space-850 p-1 rounded-lg border border-space-700">
-          <button
-            onClick={() => setSelectedPlanet('Moon')}
-            className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-all ${
-              selectedPlanet === 'Moon'
-                ? 'bg-nasa-cyan/20 text-nasa-cyan border border-nasa-cyan/40 shadow-sm'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            🌕 Moon Mode
-          </button>
-          <button
-            onClick={() => setSelectedPlanet('Mars')}
-            className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-all ${
-              selectedPlanet === 'Mars'
-                ? 'bg-nasa-red/20 text-nasa-red border border-nasa-red/40 shadow-sm'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            🔴 Mars Mode
-          </button>
+        {/* Controls: Planet Selection & 3D/2D View Mode */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 3D / 2D Mode Switcher */}
+          <div className="flex items-center gap-1 bg-space-850 p-1 rounded-lg border border-space-700">
+            <button
+              onClick={() => setViewMode('3d')}
+              className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-all flex items-center gap-1.5 ${
+                viewMode === '3d'
+                  ? 'bg-nasa-cyan/20 text-nasa-cyan border border-nasa-cyan/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Globe2 className="w-3.5 h-3.5 text-nasa-cyan animate-pulse" />
+              <span>3D Spatial Orbit</span>
+            </button>
+            <button
+              onClick={() => setViewMode('2d')}
+              className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-all ${
+                viewMode === '2d'
+                  ? 'bg-nasa-cyan/20 text-nasa-cyan border border-nasa-cyan/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>2D Tactical Map</span>
+            </button>
+          </div>
+
+          {/* Planet Toggle Buttons */}
+          <div className="flex items-center gap-2 bg-space-850 p-1 rounded-lg border border-space-700">
+            <button
+              onClick={() => setSelectedPlanet('Moon')}
+              className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-all ${
+                selectedPlanet === 'Moon'
+                  ? 'bg-nasa-cyan/20 text-nasa-cyan border border-nasa-cyan/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🌕 Moon Mode
+            </button>
+            <button
+              onClick={() => setSelectedPlanet('Mars')}
+              className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-all ${
+                selectedPlanet === 'Mars'
+                  ? 'bg-nasa-red/20 text-nasa-red border border-nasa-red/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🔴 Mars Mode
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main Map Visualizer */}
+      {/* Main Map Visualizer: 3D Spatial Orbit or 2D Planar Basemap */}
+      {viewMode === '3d' ? (
+        <Planetary3DOrbit
+          selectedPlanet={selectedPlanet}
+          setSelectedPlanet={setSelectedPlanet}
+          samples={samples}
+          onSelectSampleForAnalysis={onSelectSampleForAnalysis}
+        />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Map Viewport (8 cols) */}
         <div className="lg:col-span-8 space-y-4">
@@ -447,6 +485,7 @@ export const PlanetaryMap: React.FC<PlanetaryMapProps> = ({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

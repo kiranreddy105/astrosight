@@ -13,6 +13,7 @@ import {
   Clock,
   ExternalLink
 } from 'lucide-react';
+import { CelestialGlobe3D } from '../map/CelestialGlobe3D';
 import { DashboardStats, AnalysisRecord, SampleImage } from '../../types';
 
 interface DashboardProps {
@@ -42,13 +43,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* Hero Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl glass-panel p-8 border border-nasa-cyan/30 hud-grid">
-        <div className="relative z-10 max-w-3xl space-y-3">
+      <div className="relative overflow-hidden rounded-2xl glass-panel p-6 md:p-8 border border-nasa-cyan/30 hud-grid grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <div className="lg:col-span-8 space-y-3 relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-nasa-cyan/10 border border-nasa-cyan/30 text-nasa-cyan text-xs font-mono">
             <Sparkles className="w-3.5 h-3.5" />
             <span>DEEP LEARNING PLANETARY RECONNAISSANCE PLATFORM</span>
           </div>
-          <h2 className="text-3xl font-extrabold text-white tracking-tight font-mono">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight font-mono">
             Autonomous Geological Surface Analysis & Crater Telemetry
           </h2>
           <p className="text-sm text-slate-300 leading-relaxed">
@@ -67,13 +68,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
               className="px-5 py-2.5 rounded-lg bg-space-800/80 border border-space-700 hover:border-nasa-cyan/40 text-slate-200 font-mono text-xs uppercase tracking-wider transition-all flex items-center gap-2"
             >
               <Compass className="w-4 h-4 text-nasa-cyan" />
-              <span>Explore Planetary Map</span>
+              <span>Explore Planetary 3D Orbit</span>
             </button>
           </div>
         </div>
 
+        {/* 3D Celestial Globe Visualizer on Right */}
+        <div className="lg:col-span-4 hidden lg:flex flex-col items-center justify-center relative">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute -inset-4 orbit-ring pointer-events-none" />
+            <CelestialGlobe3D selectedPlanet={selectedPlanet} size={210} interactive={false} />
+          </div>
+          <div className="mt-3 text-center">
+            <span className="text-xs font-mono text-nasa-cyan uppercase tracking-wider font-bold">
+              {selectedPlanet.toUpperCase()} TARGET RECONNAISSANCE
+            </span>
+            <p className="text-[10px] text-slate-400 font-mono">Real-time 3D Celestial Projection</p>
+          </div>
+        </div>
+
         {/* Decorative corner grid marks */}
-        <div className="absolute right-4 top-4 text-[10px] font-mono text-slate-500 opacity-60">
+        <div className="absolute right-4 top-3 text-[10px] font-mono text-slate-500 opacity-60">
           SYS_LAT: 23.472°N | SYS_LON: 064.318°E
         </div>
       </div>
