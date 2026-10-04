@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { AboutModal } from './components/layout/AboutModal';
@@ -29,6 +30,7 @@ function AppContent() {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [samples, setSamples] = useState<SampleImage[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [systemStatus, setSystemStatus] = useState<string>('ONLINE');
   const [aboutModalOpen, setAboutModalOpen] = useState<boolean>(false);
 
   // Load telemetry stats & bundled samples on mount
@@ -64,96 +66,110 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-space-950 text-slate-100 flex flex-col relative selection:bg-nasa-cyan/30 selection:text-white">
+    <div className="min-h-screen bg-space-950 text-slate-100 flex relative selection:bg-nasa-cyan/30 selection:text-white">
       {/* 3D Cosmic Starfield & Nebula Canvas */}
       <CosmicBackground />
 
-      {/* Floating Transparent Navigation Bar */}
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        selectedPlanet={selectedPlanet}
-        setSelectedPlanet={setSelectedPlanet}
-        analyzedCount={dashboardStats?.images_analyzed || 1284}
-        isProcessing={isProcessing}
-        onOpenAbout={() => setAboutModalOpen(true)}
-      />
-
-      {/* Main Mission Control Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 z-10">
-        {activeTab === 'dashboard' && (
-          <Dashboard
-            stats={dashboardStats}
-            onNavigate={setActiveTab}
-            onLoadSample={handleLoadSample}
-            samples={samples}
-            selectedPlanet={selectedPlanet}
-          />
-        )}
-
-        {activeTab === 'analysis' && (
-          <ImageAnalysis
-            samples={samples}
-            selectedPlanet={selectedPlanet}
-            setSelectedPlanet={setSelectedPlanet}
-            activeAnalysis={activeAnalysis}
-            setActiveAnalysis={setActiveAnalysis}
-            onNavigate={setActiveTab}
-            isProcessing={isProcessing}
-            setIsProcessing={setIsProcessing}
-          />
-        )}
-
-        {activeTab === 'detection' && (
-          <CraterDetection
-            activeAnalysis={activeAnalysis}
-            onNavigate={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'spatial' && (
-          <SpatialAnalysis
-            activeAnalysis={activeAnalysis}
-            onNavigate={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'map' && (
-          <PlanetaryMap
-            selectedPlanet={selectedPlanet}
-            setSelectedPlanet={setSelectedPlanet}
-            samples={samples}
-            onSelectSampleForAnalysis={handleLoadSample}
-          />
-        )}
-
-        {activeTab === 'model' && <ModelPerformance />}
-        {activeTab === 'dataset' && <Dataset />}
-
-        {activeTab === 'history' && (
-          <AnalysisHistory
-            onSelectAnalysis={setActiveAnalysis}
-            onNavigate={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'reports' && (
-          <ReportsView
-            activeAnalysis={activeAnalysis}
-            onNavigate={setActiveTab}
-          />
-        )}
-
-        {activeTab === 'personnel' && <AdminPersonnel />}
-      </main>
-
-      {/* Scientific Disclaimer & Information Banner */}
-      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 my-4 z-10">
-        <DisclaimerBanner />
+      {/* Fixed NASA Mission Control Left Sidebar (Section 3) */}
+      <div className="hidden lg:block">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          systemStatus={systemStatus}
+          hasActiveAnalysis={activeAnalysis !== null}
+          isProcessing={isProcessing}
+        />
       </div>
 
-      {/* Minimal Scientific Application Footer with Watermark */}
-      <Footer onNavigate={setActiveTab} />
+      {/* Main Mission Control Area (offset by sidebar width 64 on large screens) */}
+      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen z-10 w-full overflow-x-hidden">
+        {/* Floating Top Mission Control Header */}
+        <Header
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          selectedPlanet={selectedPlanet}
+          setSelectedPlanet={setSelectedPlanet}
+          analyzedCount={dashboardStats?.images_analyzed || 1284}
+          isProcessing={isProcessing}
+          onOpenAbout={() => setAboutModalOpen(true)}
+        />
+
+        {/* Dynamic View Viewport */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              stats={dashboardStats}
+              onNavigate={setActiveTab}
+              onLoadSample={handleLoadSample}
+              samples={samples}
+              selectedPlanet={selectedPlanet}
+            />
+          )}
+
+          {activeTab === 'analysis' && (
+            <ImageAnalysis
+              samples={samples}
+              selectedPlanet={selectedPlanet}
+              setSelectedPlanet={setSelectedPlanet}
+              activeAnalysis={activeAnalysis}
+              setActiveAnalysis={setActiveAnalysis}
+              onNavigate={setActiveTab}
+              isProcessing={isProcessing}
+              setIsProcessing={setIsProcessing}
+            />
+          )}
+
+          {activeTab === 'detection' && (
+            <CraterDetection
+              activeAnalysis={activeAnalysis}
+              onNavigate={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'spatial' && (
+            <SpatialAnalysis
+              activeAnalysis={activeAnalysis}
+              onNavigate={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'map' && (
+            <PlanetaryMap
+              selectedPlanet={selectedPlanet}
+              setSelectedPlanet={setSelectedPlanet}
+              samples={samples}
+              onSelectSampleForAnalysis={handleLoadSample}
+            />
+          )}
+
+          {activeTab === 'model' && <ModelPerformance />}
+          {activeTab === 'dataset' && <Dataset />}
+
+          {activeTab === 'history' && (
+            <AnalysisHistory
+              onSelectAnalysis={setActiveAnalysis}
+              onNavigate={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'reports' && (
+            <ReportsView
+              activeAnalysis={activeAnalysis}
+              onNavigate={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'personnel' && <AdminPersonnel />}
+        </main>
+
+        {/* Scientific Disclaimer & Information Banner */}
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 my-2">
+          <DisclaimerBanner />
+        </div>
+
+        {/* Minimal Scientific Application Footer with Watermark */}
+        <Footer onNavigate={setActiveTab} />
+      </div>
 
       {/* Modals */}
       <AboutModal

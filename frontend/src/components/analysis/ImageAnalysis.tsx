@@ -19,7 +19,11 @@ import {
   Activity,
   Sparkles,
   Layers,
-  ArrowRight
+  ArrowRight,
+  CheckSquare,
+  Square,
+  Sliders,
+  Check
 } from 'lucide-react';
 import { SampleImage, AnalysisRecord, Crater } from '../../types';
 import { api } from '../../services/api';
@@ -60,6 +64,20 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
     sizeMb: 1.4
   });
 
+  // Controls from prompt
+  const [analysisMode, setAnalysisMode] = useState<
+    'Crater Classification' | 'Crater Detection' | 'Spatial Analysis' | 'Full Analysis'
+  >('Full Analysis');
+  const [resolutionMeters, setResolutionMeters] = useState<number>(10.0);
+  const [distanceUnit, setDistanceUnit] = useState<'meters' | 'kilometers' | 'miles'>('kilometers');
+
+  // Visualization toggles from Section 7
+  const [showOverlays, setShowOverlays] = useState<boolean>(true);
+  const [showConfidenceScores, setShowConfidenceScores] = useState<boolean>(true);
+  const [showBoundaries, setShowBoundaries] = useState<boolean>(true);
+  const [showCenterPoints, setShowCenterPoints] = useState<boolean>(true);
+  const [showBoundingBoxes, setShowBoundingBoxes] = useState<boolean>(false);
+
   // Zoom & Pan Workspace state
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -67,15 +85,18 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
   const [measurementPair, setMeasurementPair] = useState<[Crater, Crater] | null>(null);
   const [isMeasuringMode, setIsMeasuringMode] = useState<boolean>(false);
 
-  // Resolution and options
-  const [resolutionMeters, setResolutionMeters] = useState<number>(10.0);
-  const [analysisMode, setAnalysisMode] = useState<string>('Full Analysis');
-  const [applyClahe, setApplyClahe] = useState<boolean>(true);
-  const [applyDenoise, setApplyDenoise] = useState<boolean>(true);
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.60);
-
-  // Processing steps animation
-  const [currentStepIdx, setCurrentStepIdx] = useState<number>(0);
+  // Real-time processing checklist (8 steps from Section 25)
+  const processingPipelineSteps = [
+    'Image uploaded',
+    'Image preprocessing',
+    'CNN inference',
+    'Crater detection',
+    'Coordinate extraction',
+    'Spatial analysis',
+    'Visualization',
+    'Report generated'
+  ];
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [processingStatus, setProcessingStatus] = useState<'Ready' | 'Processing' | 'Analysis Complete'>(
     activeAnalysis ? 'Analysis Complete' : 'Ready'
   );
@@ -86,18 +107,11 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
   const imageRef = useRef<HTMLImageElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
 
-  const processingSteps = [
-    'Image preprocessing',
-    'Feature extraction',
-    'CNN classification',
-    'Crater identification',
-    'Confidence calculation'
-  ];
-
   // Initialize with sample or active analysis
   useEffect(() => {
     if (activeAnalysis) {
       setProcessingStatus('Analysis Complete');
+      setCompletedSteps([0, 1, 2, 3, 4, 5, 6, 7]);
       if (activeAnalysis.craters && activeAnalysis.craters.length > 0) {
         setSelectedCrater(activeAnalysis.craters[0]);
       }
@@ -156,7 +170,7 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
     setProcessingStatus('Ready');
   };
 
-  // Run AI Crater Detection
+  // Run AI Crater Detection Pipeline
   const handleRunDetection = async () => {
     if (!validationResult.isValid) {
       setErrorMsg('Not a valid image for AstroSight analysis.');
@@ -170,11 +184,17 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
     setIsProcessing(true);
     setProcessingStatus('Processing');
     setErrorMsg(null);
-    setCurrentStepIdx(0);
+    setCompletedSteps([0]);
 
+    // Animate the 8 pipeline steps sequentially
     const stepInterval = setInterval(() => {
-      setCurrentStepIdx((prev) => (prev < processingSteps.length - 1 ? prev + 1 : prev));
-    }, 700);
+      setCompletedSteps((prev) => {
+        if (prev.length < processingPipelineSteps.length) {
+          return [...prev, prev.length];
+        }
+        return prev;
+      });
+    }, 450);
 
     try {
       let finalImageUrl = previewUrl;
@@ -191,13 +211,13 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
       formData.append('planet', selectedPlanet);
       formData.append('analysis_mode', analysisMode);
       formData.append('resolution_m_px', resolutionMeters.toString());
-      formData.append('apply_clahe', applyClahe.toString());
-      formData.append('apply_denoise', applyDenoise.toString());
-      formData.append('confidence_threshold', confidenceThreshold.toString());
+      formData.append('apply_clahe', 'true');
+      formData.append('apply_denoise', 'true');
+      formData.append('confidence_threshold', '0.60');
 
       const result = await api.runFullAnalysis(formData);
       clearInterval(stepInterval);
-      setCurrentStepIdx(processingSteps.length - 1);
+      setCompletedSteps([0, 1, 2, 3, 4, 5, 6, 7]);
       setActiveAnalysis(result);
       setProcessingStatus('Analysis Complete');
 
@@ -231,7 +251,9 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Render detection boundaries if we have craters and not already using annotated image
+      if (!showOverlays) return;
+
+      // Render detection boundaries if we have craters
       const craters = activeAnalysis?.craters || [];
       craters.forEach((c) => {
         const cIdx = c.crater_index ?? c.index;
@@ -255,28 +277,39 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
         ctx.shadowBlur = isSelected ? 12 : 6;
 
         // Circular boundary
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-        ctx.stroke();
+        if (showBoundaries) {
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Bounding box toggle
+          if (showBoundingBoxes) {
+            ctx.strokeRect(c.x - c.radius, c.y - c.radius, c.radius * 2, c.radius * 2);
+          }
+        }
 
         // Center crosshair
-        ctx.fillStyle = ringColor;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, 2.5, 0, Math.PI * 2);
-        ctx.fill();
+        if (showCenterPoints) {
+          ctx.fillStyle = ringColor;
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         // Label pill
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(3, 7, 18, 0.75)';
-        ctx.fillRect(c.x - 30, c.y - c.radius - 18, 60, 14);
-        ctx.strokeStyle = ringColor;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(c.x - 30, c.y - c.radius - 18, 60, 14);
+        if (showConfidenceScores) {
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = 'rgba(3, 7, 18, 0.75)';
+          ctx.fillRect(c.x - 32, c.y - c.radius - 18, 64, 14);
+          ctx.strokeStyle = ringColor;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(c.x - 32, c.y - c.radius - 18, 64, 14);
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '9px JetBrains Mono, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`C#${cIdx} ${c.confidence.toFixed(0)}%`, c.x, c.y - c.radius - 7);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '9px JetBrains Mono, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`Crater #${cIdx} ${c.confidence.toFixed(1)}%`, c.x, c.y - c.radius - 7);
+        }
 
         ctx.restore();
       });
@@ -295,7 +328,17 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
         ctx.restore();
       }
     };
-  }, [previewUrl, activeAnalysis, selectedCrater, measurementPair]);
+  }, [
+    previewUrl,
+    activeAnalysis,
+    selectedCrater,
+    measurementPair,
+    showOverlays,
+    showBoundaries,
+    showCenterPoints,
+    showConfidenceScores,
+    showBoundingBoxes
+  ]);
 
   // Handle canvas click to select crater or measure
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -338,36 +381,54 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
   const handleZoomOut = () => setZoomLevel((z) => Math.max(z - 0.25, 0.5));
   const handleResetZoom = () => setZoomLevel(1.0);
 
-  // Craters statistics calculation
-  const totalCraters = activeAnalysis?.crater_count || 127;
-  const highConfidenceCraters =
-    activeAnalysis?.craters?.filter((c) => c.confidence >= 80).length || 103;
-  const avgConfidenceScore = activeAnalysis?.average_confidence || 94.7;
-  const surfaceCoverageKm2 = '68.4 km²';
+  // Confidence probabilities from Section 6
+  const craterProb = activeAnalysis?.classification_confidence
+    ? (activeAnalysis.classification_confidence * 100).toFixed(2)
+    : '96.82';
+  const nonCraterProb = (100 - parseFloat(craterProb)).toFixed(2);
 
   // Spatial measurement calculation for selected pair
   const measuredPairDetails = (() => {
+    let pxDist = 357.08;
+    let nameA = 'Crater A';
+    let nameB = 'Crater B';
+    let coordA = { x: 428, y: 315 };
+    let coordB = { x: 712, y: 534 };
+
     if (measurementPair) {
       const [a, b] = measurementPair;
-      const pxDist = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
-      const realMeters = pxDist * resolutionMeters;
-      const realKm = realMeters / 1000;
-      const bearing = (Math.atan2(b.y - a.y, b.x - a.x) * (180 / Math.PI) + 360) % 360;
-      return {
-        nameA: `Crater #${a.crater_index ?? a.index}`,
-        nameB: `Crater #${b.crater_index ?? b.index}`,
-        pxDist: Math.round(pxDist),
-        realKm: realKm.toFixed(2),
-        bearing: bearing.toFixed(1)
-      };
+      nameA = `Crater #${a.crater_index ?? a.index}`;
+      nameB = `Crater #${b.crater_index ?? b.index}`;
+      coordA = { x: Math.round(a.x), y: Math.round(a.y) };
+      coordB = { x: Math.round(b.x), y: Math.round(b.y) };
+      pxDist = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
+    } else if (activeAnalysis?.craters && activeAnalysis.craters.length >= 2) {
+      const a = activeAnalysis.craters[0];
+      const b = activeAnalysis.craters[1];
+      nameA = `Crater #${a.crater_index ?? a.index}`;
+      nameB = `Crater #${b.crater_index ?? b.index}`;
+      coordA = { x: Math.round(a.x), y: Math.round(a.y) };
+      coordB = { x: Math.round(b.x), y: Math.round(b.y) };
+      pxDist = Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
     }
-    // Default baseline demonstration if no pair is manually selected yet
+
+    const realMeters = pxDist * resolutionMeters;
+    const realKm = realMeters / 1000;
+    const realMiles = realKm * 0.621371;
+
+    let displayFormatted = `${realKm.toFixed(2)} km`;
+    if (distanceUnit === 'meters') displayFormatted = `${Math.round(realMeters).toLocaleString()} m`;
+    if (distanceUnit === 'miles') displayFormatted = `${realMiles.toFixed(2)} mi`;
+
     return {
-      nameA: 'Crater A (#07)',
-      nameB: 'Crater B (#14)',
-      pxDist: 842,
-      realKm: '10.53',
-      bearing: '042.8'
+      nameA,
+      nameB,
+      coordA,
+      coordB,
+      pxDist: pxDist.toFixed(2),
+      realMeters: Math.round(realMeters),
+      realKm: realKm.toFixed(2),
+      displayFormatted
     };
   })();
 
@@ -395,7 +456,7 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
     <div className="space-y-8">
       {/* 1. Image Upload Interface & Validation Zone */}
       <section className="glass-panel p-6 sm:p-8 rounded-3xl border border-nasa-cyan/20 hud-grid">
-        <div className="max-w-3xl mx-auto space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6">
           <div className="text-center space-y-2">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-tight tracking-tight">
               Upload Planetary Imagery
@@ -433,73 +494,160 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
             </div>
           </div>
 
-          {/* Upload Metadata & Validation Status Card */}
-          <div className="p-4 rounded-xl bg-space-950/80 border border-space-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono text-xs">
-            <div className="space-y-1">
-              <div className="text-slate-300 font-bold flex items-center gap-2">
+          {/* Controls: Planet, Analysis Mode, Scale, and Validation Feedback */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+            {/* Planet selector */}
+            <div className="p-3.5 rounded-xl bg-space-950/80 border border-space-700/80 space-y-2">
+              <span className="text-slate-400 text-[11px] uppercase tracking-wider block font-bold">
+                Target Planet
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlanet('Moon')}
+                  className={`py-2 px-3 rounded-lg text-center font-bold transition-all ${
+                    selectedPlanet === 'Moon'
+                      ? 'bg-nasa-cyan/20 text-nasa-cyan border border-nasa-cyan/40'
+                      : 'bg-space-850 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🌕 Moon
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlanet('Mars')}
+                  className={`py-2 px-3 rounded-lg text-center font-bold transition-all ${
+                    selectedPlanet === 'Mars'
+                      ? 'bg-nasa-red/20 text-nasa-red border border-nasa-red/40'
+                      : 'bg-space-850 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🔴 Mars
+                </button>
+              </div>
+            </div>
+
+            {/* Analysis Mode selector */}
+            <div className="p-3.5 rounded-xl bg-space-950/80 border border-space-700/80 space-y-2">
+              <span className="text-slate-400 text-[11px] uppercase tracking-wider block font-bold">
+                Analysis Mode
+              </span>
+              <select
+                value={analysisMode}
+                onChange={(e) => setAnalysisMode(e.target.value as any)}
+                className="w-full py-2 px-3 rounded-lg bg-space-850 border border-space-700 text-white font-mono text-xs focus:outline-none focus:border-nasa-cyan"
+              >
+                <option value="Full Analysis">Full Analysis (Recommended)</option>
+                <option value="Crater Classification">Crater Classification</option>
+                <option value="Crater Detection">Crater Detection</option>
+                <option value="Spatial Analysis">Spatial Analysis</option>
+              </select>
+            </div>
+
+            {/* Pixel Resolution / Scale Input */}
+            <div className="p-3.5 rounded-xl bg-space-950/80 border border-space-700/80 space-y-2">
+              <span className="text-slate-400 text-[11px] uppercase tracking-wider block font-bold">
+                Pixel Resolution (m/px)
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.5"
+                  value={resolutionMeters}
+                  onChange={(e) => setResolutionMeters(parseFloat(e.target.value) || 10.0)}
+                  className="w-full py-2 px-3 rounded-lg bg-space-850 border border-space-700 text-white font-mono text-xs focus:outline-none focus:border-nasa-cyan"
+                />
+                <span className="text-slate-400 text-[11px] whitespace-nowrap">m/px</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Prominent Button from Section 5: RUN ASTROSIGHT ANALYSIS */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-space-950/90 border border-space-700/80">
+            <div className="font-mono text-xs space-y-1">
+              <div className="flex items-center gap-2 text-slate-300 font-bold">
                 <FileImage className="w-4 h-4 text-nasa-cyan" />
                 <span className="truncate max-w-xs">{currentFilename}</span>
               </div>
-              <div className="text-slate-400 text-[11px] flex gap-3">
-                <span>FORMAT: {validationResult.format || 'JPG'}</span>
+              <div className="text-slate-400 text-[11px] flex gap-2">
+                <span>{validationResult.format || 'JPG'}</span>
                 <span>•</span>
-                <span>SIZE: {validationResult.sizeMb || 1.4} MB</span>
+                <span>{validationResult.sizeMb || 1.4} MB</span>
                 <span>•</span>
-                <span>
-                  DIMENSIONS: {validationResult.dimensions?.width || 1024} ×{' '}
-                  {validationResult.dimensions?.height || 1024} PX
-                </span>
+                {validationResult.isValid ? (
+                  <span className="text-nasa-emerald font-bold">✓ Image validated successfully</span>
+                ) : (
+                  <span className="text-red-400 font-bold">⚠ Not a valid image for AstroSight analysis.</span>
+                )}
               </div>
             </div>
 
-            {/* Validation Feedback Banner */}
-            <div className="flex items-center gap-3">
-              {validationResult.isValid ? (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-nasa-emerald/15 border border-nasa-emerald/40 text-nasa-emerald font-bold">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>✓ Image validated successfully</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/40 text-red-400 font-bold">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>⚠ Not a valid image for AstroSight analysis.</span>
-                </div>
-              )}
-
-              {/* Action Button */}
-              <button
-                onClick={handleRunDetection}
-                disabled={!validationResult.isValid || isProcessing}
-                className={`px-5 py-2.5 rounded-xl font-bold font-tight uppercase tracking-wider text-xs flex items-center gap-1.5 transition-all shadow-md ${
-                  validationResult.isValid && !isProcessing
-                    ? 'bg-gradient-to-r from-nasa-cyan via-sky-500 to-blue-600 text-space-950 hover:brightness-110 active:scale-95 shadow-nasa-cyan/20'
-                    : 'bg-space-800 text-slate-500 cursor-not-allowed border border-space-700'
-                }`}
-              >
-                <span>Run Crater Detection</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <button
+              onClick={handleRunDetection}
+              disabled={!validationResult.isValid || isProcessing}
+              className={`px-8 py-3.5 rounded-xl font-bold font-tight uppercase tracking-wider text-sm flex items-center gap-2 transition-all shadow-xl ${
+                validationResult.isValid && !isProcessing
+                  ? 'bg-gradient-to-r from-nasa-cyan via-sky-500 to-blue-600 text-space-950 hover:brightness-110 active:scale-95 shadow-nasa-cyan/25'
+                  : 'bg-space-800 text-slate-500 cursor-not-allowed border border-space-700'
+              }`}
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>RUN ASTROSIGHT ANALYSIS</span>
+            </button>
           </div>
         </div>
       </section>
 
-      {/* 2. Analysis Workspace (Two-column layout on Desktop, stacked on Tablet/Mobile) */}
+      {/* 2. Real-Time Processing Pipeline Checklist (Section 25) */}
+      {isProcessing && (
+        <section className="glass-panel p-6 rounded-2xl border border-nasa-cyan/40 bg-space-900/90 hud-grid">
+          <div className="flex items-center gap-2 text-xs font-mono text-nasa-cyan font-bold pb-3 border-b border-space-700/60">
+            <Activity className="w-4 h-4 animate-spin" />
+            <span>REAL-TIME PIPELINE INFERENCE MONITOR</span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 font-mono text-xs">
+            {processingPipelineSteps.map((step, idx) => {
+              const isDone = completedSteps.includes(idx);
+              return (
+                <div
+                  key={step}
+                  className={`p-2.5 rounded-lg border flex items-center gap-2 transition-all ${
+                    isDone
+                      ? 'bg-nasa-emerald/15 text-nasa-emerald border-nasa-emerald/40'
+                      : 'bg-space-950/60 text-slate-500 border-space-800'
+                  }`}
+                >
+                  {isDone ? (
+                    <Check className="w-4 h-4 text-nasa-emerald" />
+                  ) : (
+                    <span className="w-4 h-4 rounded-full border border-space-700 inline-block" />
+                  )}
+                  <span className="text-[11px] truncate">{step}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* 3. Analysis Workspace (Two-column Layout) */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (lg:col-span-8): Interactive Satellite Image Viewer */}
+        {/* Left Column (lg:col-span-8): Satellite Image Centerpiece */}
         <div
           ref={workspaceRef}
           className={`lg:col-span-8 glass-panel rounded-3xl border border-nasa-cyan/25 overflow-hidden flex flex-col ${
             isFullscreen ? 'fixed inset-0 z-50 rounded-none bg-space-950' : ''
           }`}
         >
-          {/* Workspace Toolbar */}
+          {/* Workspace Toolbar with Controls */}
           <div className="px-5 py-3.5 border-b border-space-700/60 bg-space-900/80 flex items-center justify-between">
             <div className="flex items-center gap-2 font-mono text-xs text-white">
               <span className="w-2.5 h-2.5 rounded-full bg-nasa-cyan animate-pulse" />
-              <span className="font-bold">SATELLITE IMAGE WORKSPACE</span>
+              <span className="font-bold">SATELLITE IMAGE</span>
               <span className="text-slate-500">|</span>
-              <span className="text-slate-400">SCALE: {resolutionMeters} M/PX</span>
+              <span className="text-slate-400">TARGET: {selectedPlanet.toUpperCase()}</span>
             </div>
 
             {/* Controls: Zoom +, Zoom -, Reset, Fit to Screen, Fullscreen */}
@@ -542,6 +690,46 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
             </div>
           </div>
 
+          {/* Overlay Toggles from Section 7 */}
+          <div className="px-5 py-2.5 bg-space-950/80 border-b border-space-800 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-300">
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-white">
+              <input
+                type="checkbox"
+                checked={showOverlays}
+                onChange={(e) => setShowOverlays(e.target.checked)}
+                className="rounded accent-nasa-cyan"
+              />
+              <span>Detection overlays</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-white">
+              <input
+                type="checkbox"
+                checked={showConfidenceScores}
+                onChange={(e) => setShowConfidenceScores(e.target.checked)}
+                className="rounded accent-nasa-cyan"
+              />
+              <span>Confidence scores</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-white">
+              <input
+                type="checkbox"
+                checked={showBoundaries}
+                onChange={(e) => setShowBoundaries(e.target.checked)}
+                className="rounded accent-nasa-cyan"
+              />
+              <span>Crater boundaries</span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-white">
+              <input
+                type="checkbox"
+                checked={showCenterPoints}
+                onChange={(e) => setShowCenterPoints(e.target.checked)}
+                className="rounded accent-nasa-cyan"
+              />
+              <span>Center points</span>
+            </label>
+          </div>
+
           {/* Interactive Canvas Viewport */}
           <div className="relative min-h-[460px] sm:min-h-[560px] flex items-center justify-center p-4 bg-space-950 overflow-auto">
             <div
@@ -558,7 +746,7 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
                 className="block max-w-full h-auto"
               />
 
-              {/* Futuristic Scanning Animation during processing */}
+              {/* Scanning laser animation during inference */}
               {isProcessing && (
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
                   <div className="w-full h-24 bg-gradient-to-b from-transparent via-nasa-cyan/25 to-nasa-cyan/40 animate-scanline" />
@@ -571,290 +759,205 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
             </div>
           </div>
 
-          {/* Legend Strip below Image */}
-          <div className="px-5 py-2.5 bg-space-900/90 border-t border-space-700/60 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-slate-400">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-nasa-cyan" />
-                <span>High Conf (&gt;80%)</span>
+          {/* Centerpiece Summary Banner */}
+          <div className="px-5 py-3 bg-space-900/90 border-t border-space-700/60 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+            <div className="flex items-center gap-4 text-slate-300">
+              <span>
+                Detected Craters: <strong className="text-white">{activeAnalysis?.crater_count || 3}</strong>
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                <span>Medium Conf (60-80%)</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-cosmic-violet" />
-                <span>Low Conf (&lt;60%)</span>
+              <span>•</span>
+              <span>
+                Average Confidence: <strong className="text-nasa-cyan">{activeAnalysis?.average_confidence || 95.4}%</strong>
               </span>
             </div>
-            <span>Click any crater to view metrics or measure</span>
+            <div className="text-nasa-cyan font-bold">
+              Selected: {measuredPairDetails.nameA} → {measuredPairDetails.nameB} ({measuredPairDetails.displayFormatted})
+            </div>
           </div>
         </div>
 
-        {/* Right Column (lg:col-span-4): Detection & Analytics Panels */}
+        {/* Right Column (lg:col-span-4): Intelligence & Spatial Panels */}
         <div className="lg:col-span-4 space-y-6">
-          {/* A. AI Crater Detection Panel */}
+          {/* A. AI Classification Panel (Section 6) */}
           <div className="glass-panel p-6 rounded-3xl border border-nasa-cyan/20 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-space-700/60">
               <div className="flex items-center gap-2">
                 <Crosshair className="w-4 h-4 text-nasa-cyan" />
                 <h3 className="text-sm font-bold font-tight text-white uppercase tracking-wider">
-                  AI Crater Detection
+                  CNN Classification
                 </h3>
               </div>
-              <span
-                className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                  processingStatus === 'Processing'
-                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 animate-pulse'
-                    : processingStatus === 'Analysis Complete'
-                    ? 'bg-nasa-emerald/20 text-nasa-emerald border border-nasa-emerald/40'
-                    : 'bg-space-800 text-slate-400 border border-space-700'
-                }`}
-              >
-                {processingStatus.toUpperCase()}
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-nasa-cyan/20 text-nasa-cyan font-bold border border-nasa-cyan/30">
+                CRATERNET
               </span>
             </div>
 
-            {/* Stepper indicators */}
-            <div className="space-y-2 font-mono text-xs">
-              {processingSteps.map((step, idx) => {
-                const isDone = processingStatus === 'Analysis Complete' || idx < currentStepIdx;
-                const isCurrent = isProcessing && idx === currentStepIdx;
-                return (
-                  <div
-                    key={step}
-                    className={`flex items-center justify-between p-2 rounded-lg transition-all ${
-                      isCurrent
-                        ? 'bg-nasa-cyan/15 text-nasa-cyan border border-nasa-cyan/30'
-                        : isDone
-                        ? 'text-slate-300 bg-space-950/40'
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="text-[10px] opacity-60">0{idx + 1}</span>
-                      <span>{step}</span>
-                    </span>
-                    {isDone ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-nasa-emerald" />
-                    ) : isCurrent ? (
-                      <Activity className="w-3.5 h-3.5 animate-spin text-nasa-cyan" />
-                    ) : (
-                      <span className="w-2 h-2 rounded-full bg-space-700" />
-                    )}
+            <div className="space-y-3 font-mono">
+              <div className="p-3.5 rounded-xl bg-space-950/80 border border-space-700/80">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Prediction</span>
+                <div className="text-xl font-extrabold text-nasa-emerald font-tight mt-0.5">
+                  CRATER DETECTED
+                </div>
+                <div className="text-xs text-nasa-cyan mt-1">Confidence: {craterProb}%</div>
+              </div>
+
+              {/* Confidence Progress & Gauge */}
+              <div className="space-y-2 text-xs">
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-300 mb-1">
+                    <span>Crater Probability</span>
+                    <span className="text-nasa-cyan font-bold">{craterProb}%</span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* B. Detection Results Panel with Radial Gauge */}
-          <div className="glass-panel p-6 rounded-3xl border border-nasa-cyan/20 space-y-4">
-            <h3 className="text-sm font-bold font-tight text-white uppercase tracking-wider pb-2 border-b border-space-700/60">
-              Detection Results
-            </h3>
-
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="p-3 rounded-xl bg-space-950/70 border border-space-700/60">
-                <span className="text-[10px] font-mono text-slate-400 uppercase">Total Craters</span>
-                <div className="text-2xl font-extrabold font-tight text-white mt-1">
-                  {totalCraters}
+                  <div className="h-2 rounded-full bg-space-900 overflow-hidden border border-space-800">
+                    <div
+                      className="h-full bg-gradient-to-r from-nasa-cyan to-blue-500 rounded-full"
+                      style={{ width: `${craterProb}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="p-3 rounded-xl bg-space-950/70 border border-space-700/60">
-                <span className="text-[10px] font-mono text-slate-400 uppercase">High Confidence</span>
-                <div className="text-2xl font-extrabold font-tight text-nasa-cyan mt-1">
-                  {highConfidenceCraters}
-                </div>
-              </div>
-            </div>
 
-            {/* Radial Confidence Gauge */}
-            <div className="p-4 rounded-xl bg-space-950/70 border border-space-700/60 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-mono text-slate-400 uppercase">Average Confidence</span>
-                <div className="text-2xl font-extrabold font-tight text-white mt-0.5">
-                  {avgConfidenceScore.toFixed(1)}%
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                    <span>Non-Crater Probability</span>
+                    <span>{nonCraterProb}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-space-900 overflow-hidden border border-space-800">
+                    <div
+                      className="h-full bg-slate-600 rounded-full"
+                      style={{ width: `${nonCraterProb}%` }}
+                    />
+                  </div>
                 </div>
-                <span className="text-[11px] font-mono text-nasa-emerald">Surface coverage: {surfaceCoverageKm2}</span>
-              </div>
-
-              {/* Circular SVG Gauge */}
-              <div className="relative w-16 h-16 flex items-center justify-center">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                  <path
-                    className="text-space-800"
-                    strokeWidth="3.5"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  <path
-                    className="text-nasa-cyan"
-                    strokeDasharray={`${avgConfidenceScore}, 100`}
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
-                <span className="absolute text-[11px] font-mono font-bold text-white">
-                  {Math.round(avgConfidenceScore)}%
-                </span>
               </div>
             </div>
           </div>
 
-          {/* C. Crater Information Panel (When Crater is Selected) */}
-          {selectedCrater && (
-            <div className="glass-panel p-6 rounded-3xl border border-nasa-cyan/30 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-space-700/60">
-                <h3 className="text-sm font-bold font-tight text-white flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-nasa-cyan" />
-                  <span>Crater #{selectedCrater.crater_index ?? selectedCrater.index}</span>
-                </h3>
-                <span className="text-xs font-mono font-bold text-nasa-cyan">
-                  {selectedCrater.confidence.toFixed(1)}% CONF
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                <div className="p-2 rounded bg-space-950/60 border border-space-800">
-                  <span className="text-[10px] text-slate-400 block">DIAMETER</span>
-                  <span className="text-white font-bold">
-                    {(selectedCrater.radius * 2 * resolutionMeters).toFixed(0)} m
-                  </span>
-                </div>
-                <div className="p-2 rounded bg-space-950/60 border border-space-800">
-                  <span className="text-[10px] text-slate-400 block">RADIUS</span>
-                  <span className="text-white font-bold">{selectedCrater.radius.toFixed(1)} px</span>
-                </div>
-                <div className="p-2 rounded bg-space-950/60 border border-space-800">
-                  <span className="text-[10px] text-slate-400 block">CENTER (X, Y)</span>
-                  <span className="text-white font-bold">
-                    {Math.round(selectedCrater.x)}, {Math.round(selectedCrater.y)}
-                  </span>
-                </div>
-                <div className="p-2 rounded bg-space-950/60 border border-space-800">
-                  <span className="text-[10px] text-slate-400 block">EST. AREA</span>
-                  <span className="text-white font-bold">
-                    {(Math.PI * Math.pow(selectedCrater.radius * resolutionMeters, 2) / 1000000).toFixed(2)} km²
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => handleResetZoom()}
-                  className="flex-1 py-2 rounded-xl bg-space-800 hover:bg-space-700 border border-space-700 text-slate-200 font-mono text-xs transition-all"
-                >
-                  View on Image
-                </button>
-                <button
-                  onClick={() => setIsMeasuringMode(true)}
-                  className={`flex-1 py-2 rounded-xl font-mono text-xs transition-all ${
-                    isMeasuringMode
-                      ? 'bg-nasa-cyan text-space-950 font-bold'
-                      : 'bg-nasa-cyan/20 text-nasa-cyan border border-nasa-cyan/40 hover:bg-nasa-cyan/30'
-                  }`}
-                >
-                  {isMeasuringMode ? 'Select 2nd Crater' : 'Measure Distance'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* D. Spatial Analysis Panel */}
+          {/* B. Spatial Analysis & Euclidean Conversion Panel (Sections 8, 9, 10) */}
           <div className="glass-panel p-6 rounded-3xl border border-nasa-cyan/20 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-space-700/60">
               <div className="flex items-center gap-2">
                 <Ruler className="w-4 h-4 text-nasa-cyan" />
                 <h3 className="text-sm font-bold font-tight text-white uppercase tracking-wider">
-                  Spatial Analysis
+                  Spatial Geodesy Engine
                 </h3>
               </div>
-              <span className="text-[10px] font-mono text-slate-400">GEODESIC ENGINE</span>
+              {/* Distance Unit selector */}
+              <div className="flex gap-1 bg-space-950 p-0.5 rounded-lg border border-space-800">
+                {(['meters', 'kilometers', 'miles'] as const).map((unit) => (
+                  <button
+                    key={unit}
+                    onClick={() => setDistanceUnit(unit)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono ${
+                      distanceUnit === unit ? 'bg-nasa-cyan text-space-950 font-bold' : 'text-slate-400'
+                    }`}
+                  >
+                    {unit === 'kilometers' ? 'km' : unit === 'meters' ? 'm' : 'mi'}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="p-4 rounded-xl bg-space-950/70 border border-space-700/60 space-y-3 font-mono text-xs">
-              <div className="flex items-center justify-between text-nasa-cyan font-bold">
+              <div className="flex items-center justify-between text-nasa-cyan font-bold border-b border-space-800 pb-2">
                 <span>{measuredPairDetails.nameA}</span>
                 <span>→</span>
                 <span>{measuredPairDetails.nameB}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+              {/* Coordinates */}
+              <div className="grid grid-cols-2 gap-3 text-[11px]">
                 <div>
-                  <span className="text-slate-400 block">PIXEL DISTANCE</span>
-                  <span className="text-white font-bold">{measuredPairDetails.pxDist} px</span>
+                  <span className="text-slate-400 block font-bold">Crater A</span>
+                  <span className="text-slate-300">
+                    X: {measuredPairDetails.coordA.x}, Y: {measuredPairDetails.coordA.y}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">RESOLUTION</span>
-                  <span className="text-white font-bold">{resolutionMeters} m/px</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">REAL DISTANCE</span>
-                  <span className="text-nasa-cyan font-extrabold text-sm">{measuredPairDetails.realKm} km</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">BEARING ANGLE</span>
-                  <span className="text-white font-bold">{measuredPairDetails.bearing}° AZ</span>
+                  <span className="text-slate-400 block font-bold">Crater B</span>
+                  <span className="text-slate-300">
+                    X: {measuredPairDetails.coordB.x}, Y: {measuredPairDetails.coordB.y}
+                  </span>
                 </div>
               </div>
+
+              <div className="pt-1 text-[11px] text-slate-400 border-t border-space-800 flex justify-between">
+                <span>Pixel Distance:</span>
+                <span className="text-white font-bold">{measuredPairDetails.pxDist} px</span>
+              </div>
+
+              <div className="text-[11px] text-slate-400 flex justify-between">
+                <span>Pixel Resolution:</span>
+                <span className="text-white font-bold">{resolutionMeters} m/px</span>
+              </div>
+
+              {/* Prominent Result from Section 9 */}
+              <div className="p-3.5 rounded-xl bg-nasa-cyan/10 border border-nasa-cyan/30 text-center space-y-1">
+                <span className="text-[10px] font-mono text-nasa-cyan uppercase tracking-widest block font-bold">
+                  DISTANCE
+                </span>
+                <div className="text-2xl font-extrabold text-white font-tight">
+                  {measuredPairDetails.displayFormatted}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsMeasuringMode(true)}
+                className={`w-full py-2 rounded-xl font-mono text-xs transition-all ${
+                  isMeasuringMode
+                    ? 'bg-nasa-cyan text-space-950 font-bold'
+                    : 'bg-space-800 hover:bg-space-700 text-slate-200 border border-space-700'
+                }`}
+              >
+                {isMeasuringMode ? 'Click 2 Craters on Image' : 'Select Two Features to Measure'}
+              </button>
             </div>
           </div>
 
-          {/* E. Analytics Bar Visualization Panel */}
-          <div className="glass-panel p-6 rounded-3xl border border-nasa-cyan/20 space-y-4">
-            <h3 className="text-sm font-bold font-tight text-white uppercase tracking-wider pb-2 border-b border-space-700/60">
-              Crater Detection Confidence
-            </h3>
+          {/* C. Crater Information Detail Panel */}
+          {selectedCrater && (
+            <div className="glass-panel p-6 rounded-3xl border border-nasa-cyan/30 space-y-3 font-mono text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-space-700/60">
+                <span className="font-bold text-white text-sm">
+                  Crater #{selectedCrater.crater_index ?? selectedCrater.index}
+                </span>
+                <span className="text-nasa-cyan font-bold">{selectedCrater.confidence.toFixed(1)}%</span>
+              </div>
 
-            {/* Minimal Bars */}
-            <div className="space-y-2">
-              {[
-                { label: 'Cluster Alpha', pct: 98 },
-                { label: 'Central Basin', pct: 96 },
-                { label: 'Rim Wall Ejecta', pct: 94 },
-                { label: 'Secondary Craters', pct: 92 },
-                { label: 'Micro Impactites', pct: 91 }
-              ].map((bar) => (
-                <div key={bar.label} className="space-y-1">
-                  <div className="flex justify-between text-[10px] font-mono text-slate-300">
-                    <span>{bar.label}</span>
-                    <span className="text-nasa-cyan font-bold">{bar.pct}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-space-900 overflow-hidden border border-space-800">
-                    <div
-                      className="h-full bg-gradient-to-r from-nasa-cyan to-blue-500 rounded-full"
-                      style={{ width: `${bar.pct}%` }}
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2 rounded bg-space-950/60 border border-space-800">
+                  <span className="text-slate-400 block text-[10px]">DIAMETER</span>
+                  <span className="text-white font-bold">
+                    {(selectedCrater.radius * 2 * resolutionMeters).toFixed(0)} m
+                  </span>
                 </div>
-              ))}
-            </div>
-
-            <div className="pt-2 grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400">
-              <div>
-                <span>DETECTION ACCURACY:</span>
-                <span className="text-white font-bold block">99.2%</span>
+                <div className="p-2 rounded bg-space-950/60 border border-space-800">
+                  <span className="text-slate-400 block text-[10px]">RADIUS</span>
+                  <span className="text-white font-bold">{selectedCrater.radius.toFixed(1)} px</span>
+                </div>
+                <div className="p-2 rounded bg-space-950/60 border border-space-800">
+                  <span className="text-slate-400 block text-[10px]">CENTER (X, Y)</span>
+                  <span className="text-white font-bold">
+                    {Math.round(selectedCrater.x)}, {Math.round(selectedCrater.y)}
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-space-950/60 border border-space-800">
+                  <span className="text-slate-400 block text-[10px]">EST. AREA</span>
+                  <span className="text-white font-bold">
+                    {(Math.PI * Math.pow(selectedCrater.radius * resolutionMeters, 2) / 1000000).toFixed(2)} km²
+                  </span>
+                </div>
               </div>
-              <div>
-                <span>PROCESSING TIME:</span>
-                <span className="text-white font-bold block">2.8 sec</span>
-              </div>
             </div>
-          </div>
+          )}
 
-          {/* F. Report Generation Actions */}
+          {/* D. Report Generation Actions */}
           <div className="flex gap-3">
             <button
               onClick={handleDownloadReport}
               className="flex-1 py-3 rounded-xl bg-gradient-to-r from-nasa-cyan to-blue-600 text-space-950 font-bold font-tight text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-nasa-cyan/20 flex items-center justify-center gap-1.5"
             >
               <Download className="w-4 h-4" />
-              <span>Generate Report</span>
+              <span>Download PDF Report</span>
             </button>
             <button
               onClick={handleExportJson}
@@ -862,7 +965,7 @@ export const ImageAnalysis: React.FC<ImageAnalysisProps> = ({
               title="Export Raw Telemetry JSON"
             >
               <FileText className="w-4 h-4" />
-              <span>Export Results</span>
+              <span>Export JSON</span>
             </button>
           </div>
         </div>
